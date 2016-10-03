@@ -89,6 +89,7 @@ import static okhttp3.mockwebserver.SocketPolicy.DISCONNECT_AT_START;
 import static okhttp3.mockwebserver.SocketPolicy.DISCONNECT_DURING_REQUEST_BODY;
 import static okhttp3.mockwebserver.SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY;
 import static okhttp3.mockwebserver.SocketPolicy.FAIL_HANDSHAKE;
+import static okhttp3.mockwebserver.SocketPolicy.GRACEFUL_SHUTDOWN_AT_END;
 import static okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE;
 import static okhttp3.mockwebserver.SocketPolicy.RESET_STREAM_AT_START;
 import static okhttp3.mockwebserver.SocketPolicy.SHUTDOWN_INPUT_AT_END;
@@ -876,6 +877,17 @@ public final class MockWebServer implements TestRule, Closeable {
       if (logger.isLoggable(Level.INFO)) {
         logger.info(MockWebServer.this + " received request: " + request
             + " and responded: " + response + " protocol is " + protocol.toString());
+      }
+
+      if (response.getSocketPolicy() == GRACEFUL_SHUTDOWN_AT_END) {
+        Http2Connection connection = stream.getConnection();
+        connection.shutdown(ErrorCode.NO_ERROR);
+        try {
+          Thread.sleep(response.getShutdownDelay(TimeUnit.MILLISECONDS));
+        } catch (InterruptedException e) {
+          throw new InterruptedIOException();
+        }
+        connection.close();
       }
     }
 

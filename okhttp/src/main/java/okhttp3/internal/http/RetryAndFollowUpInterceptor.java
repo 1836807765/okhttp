@@ -38,6 +38,7 @@ import okhttp3.Response;
 import okhttp3.Route;
 import okhttp3.internal.connection.RouteException;
 import okhttp3.internal.connection.StreamAllocation;
+import okhttp3.internal.http2.ConnectionShutdownException;
 
 import static java.net.HttpURLConnection.HTTP_CLIENT_TIMEOUT;
 import static java.net.HttpURLConnection.HTTP_MOVED_PERM;
@@ -207,7 +208,7 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
     if (!client.retryOnConnectionFailure()) return false;
 
     // We can't send the request body again.
-    if (!routeException && userRequest.body() instanceof UnrepeatableRequestBody) return false;
+    if (!routeException && isBodyUnrepeatable(e, userRequest.body())) return false;
 
     // This exception is fatal.
     if (!isRecoverable(e, routeException)) return false;
@@ -217,6 +218,10 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
 
     // For failure recovery, use the same route selector with a new connection.
     return true;
+  }
+
+  private boolean isBodyUnrepeatable(IOException e, RequestBody body) {
+    return body instanceof UnrepeatableRequestBody && !(e instanceof ConnectionShutdownException);
   }
 
   private boolean isRecoverable(IOException e, boolean routeException) {

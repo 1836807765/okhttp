@@ -791,6 +791,31 @@ public final class HttpOverHttp2Test {
     assertEquals(0, server.takeRequest().getSequenceNumber()); // New connection!
   }
 
+  @Test public void connectionNotReusedAfterShutdown() throws Exception {
+    server.enqueue(new MockResponse()
+        .setSocketPolicy(SocketPolicy.GRACEFUL_SHUTDOWN_AT_END)
+        .setBody("ABC"));
+    server.enqueue(new MockResponse()
+        .setBody("DEF"));
+
+    Call call1 = client.newCall(new Request.Builder()
+        .url(server.url("/"))
+        .build());
+    Response response1 = call1.execute();
+    assertEquals("ABC", response1.body().string());
+
+    // Allow for graceful shutdown and processing of GOAWAY frame.
+    Thread.sleep(250);
+
+    Call call2 = client.newCall(new Request.Builder()
+        .url(server.url("/"))
+        .build());
+    Response response2 = call2.execute();
+    assertEquals("DEF", response2.body().string());
+    assertEquals(0, server.takeRequest().getSequenceNumber());
+    assertEquals(0, server.takeRequest().getSequenceNumber());
+  }
+
   public Buffer gzip(String bytes) throws IOException {
     Buffer bytesOut = new Buffer();
     BufferedSink sink = Okio.buffer(new GzipSink(bytesOut));
